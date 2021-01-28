@@ -1,0 +1,24 @@
+Source: @PACKAGE_NAME@
+Section: utils
+Priority: optional
+Maintainer: @DEV_NAME@ <@DEV_EMAIL@>
+Build-Depends: @DEBHELPER_DEP@, dh-systemd (>= 1.5)
+Standards-Version: 3.9.8
+Homepage: https://@GIT_DOMAIN@/@GIT_ORG@/@GIT_REPO@
+Vcs-Git: git://@GIT_DOMAIN@/@GIT_ORG@/@GIT_REPO@.git
+Vcs-Browser: https://@GIT_DOMAIN@/@GIT_ORG@/@GIT_REPO@
+
+Package: @PACKAGE_NAME@
+Section: utils
+Architecture: all
+Depends: ${misc:Depends}, init-system-helpers (>= 1.14)
+Description: @SHORTDESC@
+ k2hr3-get-resource is a Systemd Timer Service for retrieving
+  RESOURCE data from K2HR3 System which is an RBAC System.
+  - Systemd timer service, which starts regularly.
+  - Runs on a virtual machine launched with UserDataScript by
+    the K2HR3 system.
+  - Get K2HR3 resource related to the role for the virtual
+    machine.
+  - Use the common directory /etc/antpickax.
+ .

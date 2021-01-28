@@ -1,0 +1,24 @@
+k2hr3-get-resource
+------------------
+
+K2HR3 Utilities - Get K2HR3 Resource Helper for Systemd service
+
+### Overview
+k2hr3-get-resource is a Systemd Timer Service for retrieving RESOURCE
+data from K2HR3 System which is an RBAC System provided by Yahoo! JAPAN.
+
+### Feature
+- Systemd timer service, which starts regularly.
+- Runs on a virtual machine launched with UserDataScript by the K2HR3 system.
+- Get K2HR3 resource related to the role for the virtual machine.
+- Use the common directory /etc/antpickax.
+
+### Documents
+- Github Pages - https://k2hr3.antpick.ax/
+- Github Wiki - https://github.com/yahoojapan/k2hr3_get_resource/wiki
+- AntPickax - https://antpick.ax/
+
+### License
+This software is released under the MIT License, see the license file.
+
+Copyright(C) 2021 Yahoo Japan Corporation.

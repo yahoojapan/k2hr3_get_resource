@@ -1,0 +1,703 @@
+#!/bin/sh
+#
+# K2HR3 Utilities - Get K2HR3 Resource Helper for Systemd service
+#
+# Copyright 2021 Yahoo! Japan Corporation.
+#
+# K2HR3 is K2hdkc based Resource and Roles and policy Rules, gathers
+# common management information for the cloud.
+# K2HR3 can dynamically manage information as "who", "what", "operate".
+# These are stored as roles, resources, policies in K2hdkc, and the
+# client system can dynamically read and modify these information.
+#
+# For the full copyright and license information, please view
+# the license file that was distributed with this source code.
+#
+# AUTHOR:   Takeshi Nakatani
+# CREATE:   Wed Jan 20 2021
+# REVISION:
+#
+
+#---------------------------------------------------------------------
+# Common variables
+#---------------------------------------------------------------------
+SCRIPTNAME=`basename $0`
+BASE_SCRIPTNAME=`echo ${SCRIPTNAME} | sed 's/\./ /g' | awk '{print $1}'`
+SCRIPTDIR=`dirname $0`
+SCRIPTDIR=`cd ${SCRIPTDIR}; pwd`
+
+#
+# Options
+#
+# [NOTE]
+# The option only accepts "-daemon".
+# If it is passed "-daemon" option, it acts as a daemon that waits
+# until the systemd k2hr3-get-resource.timer is disabled.
+# When k2hr3-get-resource.timer is disabled, the file that output the
+# resource is deleted and the process is terminated.
+#
+if [ "X$1" = "X-daemon" ]; then
+	SCRIPT_MODE="daemon"
+else
+	SCRIPT_MODE="normal"
+fi
+USE_DAEMON=1
+
+#
+# systemd timer name
+#
+SYSTEMD_TIMER_NAME="k2hr3-get-resource.timer"
+
+#
+# Instance ID file by cloud-init
+#
+CLOUDINIT_DATA_DIR="/var/lib/cloud/data"
+INSTANCE_ID_FILE="${CLOUDINIT_DATA_DIR}/instance-id"
+
+#
+# Default configuration values
+#
+SCRIPT_DIR_PART_NAME="antpickax"
+
+CONFDIR="/etc/${SCRIPT_DIR_PART_NAME}"
+SCRIPT_CONF_FILE="${BASE_SCRIPTNAME}.conf"
+OVERRIDE_FILE="override.conf"
+
+PIDDIR="/var/run/${SCRIPT_DIR_PART_NAME}"
+SCRIPT_PIDFILE="${BASE_SCRIPTNAME}.pid"
+SCRIPT_DAEMON_PIDFILE="${BASE_SCRIPTNAME}-daemon.pid"
+
+# [NOTE]
+# The following are the variables used to specify this helper script
+# and the log file for the subprocess.
+# Normally, the log is left to jounald or syslog related to systemd,
+# so it is not specified.
+# If you want to collect logs yourself, set the values in the following
+# variables. For reference, it can be set as follows:
+#
+#	LOGDIR="/var/log/${SCRIPT_DIR_PART_NAME}"
+#	SCRIPT_LOGFILE="${BASE_SCRIPTNAME}.log"
+#
+# These values can be specified in configuration file or override.conf.
+#
+LOGDIR=""
+SCRIPT_LOGFILE=""
+
+#
+# Load K2HR3 variables from files
+#
+# [NOTE]
+# Set/Load default resource yrn path and output directory/file name.
+#
+
+# K2HR3 related files
+K2HR3_ROLE_TOKEN_FILE="${CONFDIR}/k2hr3-role-token"
+K2HR3_ROLE_NAME_FILE="${CONFDIR}/k2hr3-role-name"
+K2HR3_API_HOST_URI_FILE="${CONFDIR}/k2hr3-api-uri"
+
+if [ -f ${K2HR3_ROLE_NAME_FILE} ]; then
+	RESOURCE_PATH=`cat ${K2HR3_ROLE_NAME_FILE} | sed -e 's/:[rR][oO][lL][eE]:/:resource:/g'`
+else
+	RESOURCE_PATH=
+fi
+if [ "X${RESOURCE_PATH}" != "X" ]; then
+	OUTPUT_FILE=`echo ${RESOURCE_PATH} | sed 's#[:/]# #g' | awk '{print $NF}'`
+else
+	OUTPUT_FILE=
+fi
+OUTPUT_DIR=${CONFDIR}
+
+#---------------------------------------------------------------------
+# Utilitiy functions
+#---------------------------------------------------------------------
+#
+# Message
+#
+# $1 	:	1(stdout) or 2(stderr)
+# $2 	:	Level
+# $3... :	Messages
+#
+print_message()
+{
+	if [ $1 -eq 2 ]; then
+		_PRINT_STDERR=1
+	else
+		_PRINT_STDERR=0
+	fi
+	if [ "X$2" = "X" ]; then
+		_PRINT_LEVEL="ERROR"
+	else
+		_PRINT_LEVEL=$2
+	fi
+	_PRINT_DATE=`date +%FT%T%z`
+	shift; shift;
+
+	if [ "X${LOGDIR}" != "X" -a "X${SERVICE_LOGFILE}" != "X" ]; then
+		echo "${_PRINT_DATE} ${SCRIPTNAME} [${_PRINT_LEVEL}] $@" >> ${LOGDIR}/${SERVICE_LOGFILE}
+	else
+		if [ ${_PRINT_STDERR} -eq 1 ]; then
+			echo "${_PRINT_DATE} ${SCRIPTNAME} [${_PRINT_LEVEL}] $@" 1>&2
+		else
+			echo "${_PRINT_DATE} ${SCRIPTNAME} [${_PRINT_LEVEL}] $@"
+		fi
+	fi
+}
+
+log_err()
+{
+	print_message 1 "ERROR" $@
+}
+
+log_warn()
+{
+	print_message 1 "WARNING" $@
+}
+
+log_info()
+{
+	print_message 1 "INFO" $@
+}
+
+prn_err()
+{
+	print_message 2 "ERROR" $@
+}
+
+prn_warn()
+{
+	print_message 2 "WARNING" $@
+}
+
+prn_info()
+{
+	print_message 2 "INFO" $@
+}
+
+#
+# Check file
+#
+# $1 :	File name/path
+#
+is_safe_file()
+{
+	if [ $# -eq 0 ]; then
+		echo "There are no arguments(is_safe_file)"
+		return 1
+	fi
+	if [ ! -f $1 ]; then
+		echo "$1 is not safe file."
+		return 1
+	fi
+	return 0
+}
+
+#
+# Get value by key name from file
+#
+# $1 :	Key name
+# $2 :	File name/path
+#
+extract_value()
+{
+	#
+	# Check parameters
+	#
+	if [ $# -lt 2 ]; then
+		echo "Not enough arguments - $@"
+		return 1
+	fi
+
+	_EXTRACTVALUE_KEY=$1
+	_EXTRACTVALUE_FILE=$2
+	_ERROR_MSG=`is_safe_file ${_EXTRACTVALUE_FILE}`
+	if [ $? -ne 0 ]; then
+		echo "${_ERROR_MSG}"
+		return 1
+	fi
+
+	#
+	# Get latest matching line
+	#
+	_EXTRACTVALUE_LINE=`grep -v "^[[:space:]]*#" ${_EXTRACTVALUE_FILE} | grep "^[[:space:]]*${_EXTRACTVALUE_KEY}[[:space:]]*=" | tail -1`
+	if [ "X${_EXTRACTVALUE_LINE}" = "X" ]; then
+		echo ""
+		return 0
+	fi
+
+	#
+	# Get value(trimed head/tail spaces)
+	#
+	_EXTRACTVALUE_VALUE=`echo ${_EXTRACTVALUE_LINE} | sed "s/^[[:space:]]*${_EXTRACTVALUE_KEY}[[:space:]]*=//g" | sed "s/^[[:space:]]*//g" | sed "s/[[:space:]]*$//g"`
+
+	echo ${_EXTRACTVALUE_VALUE}
+	return 0
+}
+
+#
+# Get value by key name from file
+#
+# $1 :	Key name
+# $2 :	File name/path
+# $3 :	Override file name/path(allow empty)
+#
+get_value()
+{
+	#
+	# Check parameters
+	#
+	if [ $# -lt 2 ]; then
+		echo "Not enough arguments - $@"
+		return 1
+	fi
+
+	_GETVALUE_KEY=$1
+	_GETVALUE_FILE=$2
+	_ERROR_MSG=`is_safe_file ${_GETVALUE_FILE}`
+	if [ $? -ne 0 ]; then
+		echo "${_ERROR_MSG}"
+		return 1
+	fi
+
+	if [ $# -ge 3 ]; then
+		_GETVALUE_OVERRIDE_FILE=$3
+		_ERROR_MSG=`is_safe_file ${_GETVALUE_OVERRIDE_FILE}`
+		if [ $? -ne 0 ]; then
+			#
+			# Skip this file becase the file is optinal file
+			#
+			prn_warn "${_ERROR_MSG}"
+			_GETVALUE_OVERRIDE_FILE=
+		fi
+	else
+		_GETVALUE_OVERRIDE_FILE=
+	fi
+
+	#
+	# Check override file and switch file and key
+	#
+	# [NOTE]
+	# The override file is used to replace the file and key with different values
+	# in the following formats(file and key pair):
+	#
+	# <file name>:<key name> = <replace file name/path>:<replace key name>
+	#
+	if [ "X${_GETVALUE_OVERRIDE_FILE}" != "X" ]; then
+		#
+		# Make key for override file
+		#
+		_GETVALUE_FILE_NAME=`basename ${_GETVALUE_FILE}`
+		_GETVALUE_OVERRIDE_PAIRKEY="${_GETVALUE_FILE_NAME}:${_GETVALUE_KEY}"
+
+		#
+		# Search key in override configutation file
+		#
+		_GETVALUE_OVERRIDE_VALUE=`extract_value ${_GETVALUE_OVERRIDE_PAIRKEY} ${_GETVALUE_OVERRIDE_FILE}`
+		if [ $? -eq 0 ]; then
+			#
+			# Found key and parse it
+			#
+			# [NOTE]
+			# The value is "<replace file/path>:<replace key name>" or "value"
+			#
+			echo ${_GETVALUE_OVERRIDE_VALUE} | grep ':' >/dev/null 2>&1
+			if [ $? -ne 0 ]; then
+				#
+				# Case : "value" directly
+				#
+				echo ${_GETVALUE_OVERRIDE_VALUE}
+				return 0
+
+			else
+				#
+				# Case : "<replace file/path>:<replace key name>"
+				#
+				_GETVALUE_REPLACE_FILE=`echo ${_GETVALUE_OVERRIDE_VALUE} | sed 's/:/ /g' | awk '{print $1}'`
+				_GETVALUE_REPLACE_KEY=`echo ${_GETVALUE_OVERRIDE_VALUE} | sed 's/:/ /g' | awk '{print $2}'`
+
+				if [ "X${_GETVALUE_REPLACE_FILE}" != "X" -a "X${_GETVALUE_REPLACE_KEY}" != "X" ]; then
+					#
+					# Check override configuration file
+					#
+					echo ${_GETVALUE_REPLACE_FILE} | grep -o '^/' >/dev/null 2>&1
+					if [ $? -ne 0 ]; then
+						#
+						# file is relative file path, convert to absolute path
+						#
+						_GETVALUE_TMP_FILENAME=`basename ${_GETVALUE_REPLACE_FILE}`
+						_GETVALUE_TMP_RELATIVE=`dirname ${_GETVALUE_REPLACE_FILE}`
+						_GETVALUE_TMP_CURRENT=`dirname ${_GETVALUE_OVERRIDE_FILE}`
+						_GETVALUE_TMP_ABSOLUTE=`cd ${_GETVALUE_TMP_CURRENT}/${_GETVALUE_TMP_RELATIVE}; pwd`
+
+						_GETVALUE_REPLACE_FILE="${_GETVALUE_TMP_ABSOLUTE}/${_GETVALUE_TMP_FILENAME}"
+					fi
+
+					if [ -f ${_GETVALUE_REPLACE_FILE} ]; then
+						#
+						# file is safe, switch file and key
+						#
+						_GETVALUE_KEY=${_GETVALUE_REPLACE_KEY}
+						_GETVALUE_FILE=${_GETVALUE_REPLACE_FILE}
+					fi
+				fi
+			fi
+		fi
+	fi
+
+	#
+	# Search key in configuration file
+	#
+	_GETVALUE_VALUE=`extract_value ${_GETVALUE_KEY} ${_GETVALUE_FILE}`
+	if [ $? -ne 0 ]; then
+		echo "Not found ${_GETVALUE_KEY} in ${_GETVALUE_FILE}"
+		return 1
+	fi
+
+	#
+	# Found key and return value
+	#
+	echo ${_GETVALUE_VALUE}
+	return 0
+}
+
+#---------------------------------------------------------------------
+# Load configuration and check
+#---------------------------------------------------------------------
+#
+# PIDDIR
+#
+_TMP_VALUE=`get_value "PIDDIR" ${CONFDIR}/${SCRIPT_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(PIDDIR) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	PIDDIR=${_TMP_VALUE}
+fi
+if [ "X${PIDDIR}" != "X" ]; then
+	if [ ! -d ${PIDDIR} ]; then
+		mkdir -p ${PIDDIR}
+		if [ $? -ne 0 ]; then
+			log_err "Could not make directory ${PIDDIR} for PID file."
+			exit 1
+		fi
+	fi
+fi
+
+#
+# SCRIPT_PIDFILE
+#
+_TMP_VALUE=`get_value "SCRIPT_PIDFILE" ${CONFDIR}/${SCRIPT_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(SCRIPT_PIDFILE) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	SCRIPT_PIDFILE=${_TMP_VALUE}
+fi
+
+#
+# LOGDIR
+#
+_TMP_VALUE=`get_value "LOGDIR" ${CONFDIR}/${SCRIPT_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(LOGDIR) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	LOGDIR=${_TMP_VALUE}
+fi
+if [ "X${LOGDIR}" != "X" ]; then
+	if [ ! -d ${LOGDIR} ]; then
+		mkdir -p ${LOGDIR}
+		if [ $? -ne 0 ]; then
+			log_err "Could not make directory ${LOGDIR} for log files."
+			exit 1
+		fi
+	fi
+	# [NOTE]
+	# If you start a subprocess other than the user of this script, you must allow permissions.
+	#
+	chmod 0777 ${LOGDIR}
+	if [ $? -ne 0 ]; then
+		log_warn "Could not change attributes for directory ${LOGDIR}, but it is not critical so continue..."
+	fi
+fi
+
+#
+# SCRIPT_LOGFILE
+#
+_TMP_VALUE=`get_value "SCRIPT_LOGFILE" ${CONFDIR}/${SCRIPT_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	log_err "Failed loading the configuration(SCRIPT_LOGFILE) value : ${_TMP_VALUE}"
+	exit 1
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	SCRIPT_LOGFILE=${_TMP_VALUE}
+fi
+
+#
+# RESOURCE_PATH
+#
+_TMP_VALUE=`get_value "RESOURCE_PATH" ${CONFDIR}/${SCRIPT_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	if [ "X${RESOURCE_PATH}" = "X" ]; then
+		log_err "There is no configuration value(RESOURCE_PATH) in configuration files and default value is empty."
+		exit 1
+	fi
+	log_info "There is no configuration value(RESOURCE_PATH) in configuration files, thus use default value(${RESOURCE_PATH})"
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	RESOURCE_PATH=${_TMP_VALUE}
+fi
+if [ "X${RESOURCE_PATH}" = "X" ]; then
+	log_err "The configuration value(RESOURCE_PATH) is empty."
+	exit 1
+fi
+
+#
+# OUTPUT_FILE
+#
+_TMP_VALUE=`get_value "OUTPUT_FILE" ${CONFDIR}/${SCRIPT_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	if [ "X${OUTPUT_FILE}" = "X" ]; then
+		log_err "There is no configuration value(OUTPUT_FILE) in configuration files and default value is empty."
+		exit 1
+	fi
+	log_info "There is no configuration value(OUTPUT_FILE) in configuration files, thus use default value(${OUTPUT_FILE})"
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	OUTPUT_FILE=${_TMP_VALUE}
+fi
+if [ "X${OUTPUT_FILE}" = "X" ]; then
+	log_err "The configuration value(OUTPUT_FILE) is empty."
+	exit 1
+fi
+
+#
+# OUTPUT_DIR
+#
+_TMP_VALUE=`get_value "OUTPUT_DIR" ${CONFDIR}/${SCRIPT_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	if [ "X${OUTPUT_DIR}" = "X" ]; then
+		log_err "There is no configuration value(OUTPUT_DIR) in configuration files and default value is empty."
+		exit 1
+	fi
+	log_info "There is no configuration value(OUTPUT_DIR) in configuration files, thus use default value(${OUTPUT_DIR})"
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	OUTPUT_DIR=${_TMP_VALUE}
+fi
+
+#
+# USE_DAEMON
+#
+_TMP_VALUE=`get_value "USE_DAEMON" ${CONFDIR}/${SCRIPT_CONF_FILE} ${CONFDIR}/${OVERRIDE_FILE}`
+if [ $? -ne 0 ]; then
+	if [ "X${USE_DAEMON}" = "X" ]; then
+		log_err "There is no configuration value(USE_DAEMON) in configuration files and default value is empty."
+		exit 1
+	fi
+	log_info "There is no configuration value(USE_DAEMON) in configuration files, thus use default value(${USE_DAEMON})"
+elif [ "X${_TMP_VALUE}" = "Xtrue" -o "X${_TMP_VALUE}" = "XTRUE" -o "X${_TMP_VALUE}" = "X1" ]; then
+	USE_DAEMON=1
+elif [ "X${_TMP_VALUE}" = "Xfalse" -o "X${_TMP_VALUE}" = "XFALSE" -o "X${_TMP_VALUE}" = "X0" ]; then
+	USE_DAEMON=0
+elif [ "X${_TMP_VALUE}" != "X" ]; then
+	log_warn "USE_DAEMON value in configuration is wrong value(${_TMP_VALUE}), then use default(${USE_DAEMON})."
+fi
+
+#
+# Check K2HR3 variables
+#	K2HR3_ROLE_TOKEN
+#	K2HR3_API_HOST_URI
+#
+#
+if [ -f ${K2HR3_ROLE_TOKEN_FILE} ]; then
+	K2HR3_ROLE_TOKEN=`cat ${K2HR3_ROLE_TOKEN_FILE}`
+else
+	log_err "There is no K2HR3 role token file(${K2HR3_ROLE_TOKEN_FILE})."
+	exit 1
+fi
+if [ -f ${K2HR3_API_HOST_URI_FILE} ]; then
+	K2HR3_API_HOST_URI=`cat ${K2HR3_API_HOST_URI_FILE}`
+else
+	log_err "There is no K2HR3 REST API URI file(${K2HR3_API_HOST_URI_FILE})."
+	exit 1
+fi
+
+#---------------------------------------------------------------------
+# Main
+#---------------------------------------------------------------------
+if [ "X${SCRIPT_MODE}" != "Xdaemon" ]; then
+	#
+	# Start getting processing
+	#
+	log_info "Start getting processing"
+
+	#
+	# Check old process
+	#
+	if [ -f ${PIDDIR}/${SCRIPT_PIDFILE} ]; then
+		OLD_PROCESS_PID=`cat ${PIDDIR}/${SCRIPT_PIDFILE}`
+		if [ $$ -ne ${OLD_PROCESS_PID} ]; then
+			ps -p ${OLD_PROCESS_PID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
+			if [ $? -eq 0 ]; then
+				log_err "Already process PID(${OLD_PROCESS_PID}) running, thus this script exits."
+				exit 1
+			fi
+		fi
+	fi
+	#
+	# Write process id to PID FILE
+	#
+	echo $$ > ${PIDDIR}/${SCRIPT_PIDFILE}
+
+	#
+	# Check CUK(Instance ID)
+	#
+	if [ ! -f ${INSTANCE_ID_FILE} ]; then
+		log_warn "Not found ${INSTANCE_ID_FILE} file for CUK."
+		INSTANCE_ID=
+	else
+		INSTANCE_ID=`cat ${INSTANCE_ID_FILE} 2>/dev/null | tr -d '\n' 2>/dev/null`
+		if [ "X${INSTANCE_ID}" = "X" ]; then
+			log_warn "Empty value for Instance Id in ${INSTANCE_ID_FILE} file."
+		fi
+	fi
+
+	#
+	# Get resource
+	#
+	GET_RESULT=`curl -s -S -X GET -H "Content-Type: application/json" -H "x-auth-token: R=${K2HR3_ROLE_TOKEN}" "${K2HR3_API_HOST_URI}/v1/resource/${RESOURCE_PATH}" 2>&1`
+	if [ $? -ne 0 ]; then
+		log_err "Failed getting resource(path: ${RESOURCE_PATH})."
+		rm -f ${PIDDIR}/${SCRIPT_PIDFILE}
+		exit 1
+	fi
+	log_info "Success accessing K2HR3 resource(${RESOURCE_PATH})"
+
+	# Check response(expect -> "result": true)
+	echo ${GET_RESULT} | tr '[:lower:]' '[:upper:]' | grep '["]*RESULT["]*:[[:space:]]*TRUE[[:space:]]*,' >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		# Get error message(expect -> "message": "...")
+		GET_RESULT_MSG=`echo ${GET_RESULT} | sed -e 's/^.*["]*[mM][eE][sS][sS][aA][gG][eE]["]*:[[:space:]]*//g' -e 's/,.*$//g' -e 's/}.*//g' -e 's/"//g'`
+		log_err "Failed getting resource(path: ${RESOURCE_PATH}) with response(${GET_RESULT_MSG})."
+		rm -f ${PIDDIR}/${SCRIPT_PIDFILE}
+		exit 1
+	fi
+	log_info "Success getting K2HR3 resource(${RESOURCE_PATH})"
+
+	#
+	# Check and Put resource to file
+	#
+	log_info "Check and put resource(${RESOURCE_PATH}) to file(${OUTPUT_DIR}/${OUTPUT_FILE})"
+
+	# Put resource to temporary file with converting CR and instance id
+	TEMP_RESOURCE_FILE="/tmp/.$$_${OUTPUT_FILE}"
+	echo ${GET_RESULT} | sed -e 's/^.*["]*[rR][eE][sS][oO][uU][rR][cC][eE]["]*:[[:space:]]*"//g' -e 's/"}$//g' -e 's/\\n/\n/g' -e "s/__SELF_INSTANCE_ID__/${INSTANCE_ID}/g" > ${TEMP_RESOURCE_FILE} 2>/dev/null
+
+	# Check file differences
+	diff ${TEMP_RESOURCE_FILE} ${OUTPUT_DIR}/${OUTPUT_FILE} >/dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		cat ${TEMP_RESOURCE_FILE} > ${OUTPUT_DIR}/${OUTPUT_FILE}
+		if [ $? -ne 0 ]; then
+			log_err "Could not update ${OUTPUT_DIR}/${OUTPUT_FILE} file."
+			rm -f ${TEMP_RESOURCE_FILE}
+			rm -f ${PIDDIR}/${SCRIPT_PIDFILE}
+			exit 1
+		fi
+		log_info "Success updating ${OUTPUT_DIR}/${OUTPUT_FILE} file."
+	else
+		log_info "Nothing to update ${OUTPUT_DIR}/${OUTPUT_FILE} file, because ${RESOURCE_PATH} resoruce is not changed."
+	fi
+	rm -f ${TEMP_RESOURCE_FILE}
+
+	#
+	# Launch daemon if not running
+	#
+	if [ ${USE_DAEMON} -eq 1 ]; then
+		#
+		# Check daemon process running
+		#
+		IS_NEED_DAEMON_RUN=0
+		if [ -f ${PIDDIR}/${SCRIPT_DAEMON_PIDFILE} ]; then
+			OLD_DAEMON_PROCESS_PID=`cat ${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}`
+			ps -p ${OLD_DAEMON_PROCESS_PID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
+			if [ $? -ne 0 ]; then
+				rm -f ${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}
+				IS_NEED_DAEMON_RUN=1
+			fi
+		else
+			IS_NEED_DAEMON_RUN=1
+		fi
+
+		#
+		# Run daemon process
+		#
+		if [ ${IS_NEED_DAEMON_RUN} -eq 1 ]; then
+			${SCRIPTDIR}/${SCRIPTNAME} -${SCRIPT_MODE} >/dev/null 2>&1 </dev/null &
+		fi
+	fi
+
+	#
+	# Finish
+	#
+	rm -f ${PIDDIR}/${SCRIPT_PIDFILE}
+
+	log_info "Success getting processing"
+
+else
+	#
+	# Start daemon process
+	#
+	log_info "Start daemon process"
+
+	if [ ${USE_DAEMON} -eq 1 ]; then
+		#
+		# Check old process
+		#
+		if [ -f ${PIDDIR}/${SCRIPT_DAEMON_PIDFILE} ]; then
+			OLD_DAEMON_PROCESS_PID=`cat ${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}`
+			ps -p ${OLD_DAEMON_PROCESS_PID} | grep -v PID | grep -v [Dd]efunct >/dev/null 2>&1
+			if [ $? -eq 0 ]; then
+				log_err "Already process PID(${OLD_DAEMON_PROCESS_PID}) running, thus this daemon exits."
+				exit 1
+			fi
+			rm -f ${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}
+		fi
+		#
+		# Write process id to PID FILE
+		#
+		echo $$ > ${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}
+
+		#
+		# Wait for disable timer
+		#
+		IS_LOOP=1
+		while [ ${IS_LOOP} -eq 1 ]; do
+			sudo systemctl is-enabled ${SYSTEMD_TIMER_NAME} >/dev/null 2>&1
+			if [ $? -ne 0 ]; then
+				IS_LOOP=0
+			fi
+		done
+
+		#
+		# Delete file
+		#
+		rm -f ${OUTPUT_DIR}/${OUTPUT_FILE}
+
+		#
+		# Finish
+		#
+		rm -f ${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}
+
+		log_info "${SYSTEMD_TIMER_NAME} is disabled, so removed ${OUTPUT_DIR}/${OUTPUT_FILE}"
+
+	else
+		log_info "USE_DAEMON value is not enabled."
+	fi
+fi
+
+exit 0
+
+#
+# Local variables:
+# tab-width: 4
+# c-basic-offset: 4
+# End:
+# vim600: noexpandtab sw=4 ts=4 fdm=marker
+# vim<600: noexpandtab sw=4 ts=4
+#

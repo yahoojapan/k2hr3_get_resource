@@ -1,0 +1,97 @@
+#
+# K2HR3 Utilities - Get K2HR3 Resource Helper for Systemd service
+#
+# Copyright 2021 Yahoo! Japan Corporation.
+#
+# K2HR3 is K2hdkc based Resource and Roles and policy Rules, gathers
+# common management information for the cloud.
+# K2HR3 can dynamically manage information as "who", "what", "operate".
+# These are stored as roles, resources, policies in K2hdkc, and the
+# client system can dynamically read and modify these information.
+#
+# For the full copyright and license information, please view
+# the license file that was distributed with this source code.
+#
+# AUTHOR:   Takeshi Nakatani
+# CREATE:   Wed Jan 20 2021
+# REVISION:
+#
+
+#
+# Local macros/define
+#
+%if %{undefined package_revision}
+%global package_revision 1
+%endif
+
+%if %{undefined make_build}
+%global make_build %{__make} %{?_smp_mflags}
+%endif
+
+%if %{undefined autosetup}
+%global autosetup %setup -q
+%endif
+
+%global gittag v@VERSION@
+
+%if %{undefined make_check}
+%global make_check 1
+%endif
+
+#
+# main package
+#
+Summary: @SHORTDESC@
+Name: @PACKAGE_NAME@
+Version: @VERSION@
+Release: %{package_revision}%{?dist}
+License: @PKGLICENSE@
+@RPMPKG_GROUP@
+URL: https://@GIT_DOMAIN@/@GIT_ORG@/@PACKAGE_NAME@
+Source0: https://@GIT_DOMAIN@/@GIT_ORG@/@PACKAGE_NAME@/archive/%{gittag}/%{name}-%{version}.tar.gz
+BuildRequires: systemd git-core make
+BuildArch: noarch
+
+%description
+k2hr3-get-resource is a Systemd Timer Service for retrieving
+RESOURCE data from K2HR3 System which is an RBAC System.
+- Systemd timer service, which starts regularly.
+- Runs on a virtual machine launched with UserDataScript by
+  the K2HR3 system.
+- Get K2HR3 resource related to the role for the virtual
+  machine.
+- Use the common directory /etc/antpickax.
+
+%prep
+%autosetup -n %{name}-%{version}
+
+%build
+./autogen.sh
+%configure --disable-static @CONFIGUREWITHOPT@
+%make_build
+
+%install
+%make_install
+install -D -m 644 src/@PACKAGE_NAME@.timer %{buildroot}/lib/systemd/system/@PACKAGE_NAME@.timer
+install -D -m 644 src/@PACKAGE_NAME@.service %{buildroot}/lib/systemd/system/@PACKAGE_NAME@.service
+install -D -m 755 src/@PACKAGE_NAME@-helper %{buildroot}/usr/libexec/@PACKAGE_NAME@-helper
+install -D -m 644 src/@PACKAGE_NAME@-helper.conf %{buildroot}/etc/antpickax/@PACKAGE_NAME@-helper.conf
+
+%if %{make_check}
+%check
+%{__make} check
+%endif
+
+%files
+%license COPYING
+%doc README AUTHORS ChangeLog
+/lib/systemd/system/@PACKAGE_NAME@.timer
+/lib/systemd/system/@PACKAGE_NAME@.service
+/usr/libexec/@PACKAGE_NAME@-helper
+/etc/antpickax/*
+
+%preun
+%systemd_preun @PACKAGE_NAME@.timer
+
+%changelog
+@RPMCHANGELOG@
