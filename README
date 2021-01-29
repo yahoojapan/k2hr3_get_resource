@@ -1,11 +1,11 @@
-k2hr3-get-resource
-------------------
+K2HR3 Get Resource(K2HR3 Utilities)
+-----------------------------------
 
 K2HR3 Utilities - Get K2HR3 Resource Helper for Systemd service
 
 ### Overview
-k2hr3-get-resource is a Systemd Timer Service for retrieving RESOURCE
-data from K2HR3 System which is an RBAC System provided by Yahoo! JAPAN.
+K2HR3 Get Resource is a Systemd Timer Service for retrieving RESOURCE
+data from K2HR3 System, this is one of utility for it.
 
 ### Feature
 - Systemd timer service, which starts regularly.
