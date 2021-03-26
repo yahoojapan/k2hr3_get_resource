@@ -37,6 +37,7 @@ K2HR3 Get Resource is a Systemd Timer Service for retrieving RESOURCE data from 
 ## Documents
 [K2HR3 Document](https://k2hr3.antpick.ax/index.html)  
 [K2HR3 Web Application Usage](https://k2hr3.antpick.ax/usage_app.html)  
+[K2HR3 Command Line Interface Usage](https://k2hr3.antpick.ax/cli.html)  
 [K2HR3 REST API Usage](https://k2hr3.antpick.ax/api.html)  
 [K2HR3 OpenStack Notification Listener Usage](https://k2hr3.antpick.ax/detail_osnl.html)  
 [K2HR3 Watcher Usage](https://k2hr3.antpick.ax/tools.html)  
@@ -54,6 +55,7 @@ K2HR3 Get Resource is a Systemd Timer Service for retrieving RESOURCE data from 
 ## Repositories
 [K2HR3 main repository](https://github.com/yahoojapan/k2hr3)  
 [K2HR3 Web Application repository](https://github.com/yahoojapan/k2hr3_app)  
+[K2HR3 Command Line Interface repository](https://github.com/yahoojapan/k2hr3_cli)  
 [K2HR3 REST API repository](https://github.com/yahoojapan/k2hr3_api)  
 [K2HR3 OpenStack Notification Listener](https://github.com/yahoojapan/k2hr3_osnl)  
 [K2HR3 Utilities](https://github.com/yahoojapan/k2hr3_utils)  
