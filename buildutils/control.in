@@ -2,7 +2,7 @@ Source: @PACKAGE_NAME@
 Section: utils
 Priority: optional
 Maintainer: @DEV_NAME@ <@DEV_EMAIL@>
-Build-Depends: @DEBHELPER_DEP@, dh-systemd (>= 1.5)
+Build-Depends: @DEBHELPER_DEP@
 Standards-Version: 3.9.8
 Homepage: https://@GIT_DOMAIN@/@GIT_ORG@/@GIT_REPO@
 Vcs-Git: git://@GIT_DOMAIN@/@GIT_ORG@/@GIT_REPO@.git
