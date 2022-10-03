@@ -96,7 +96,8 @@ AC_CONFIG_FILES([Makefile
 				buildutils/Makefile
 				buildutils/control
 				buildutils/copyright
-				buildutils/k2hr3-get-resource.spec])
+				buildutils/k2hr3-get-resource.spec
+				tests/Makefile])
 
 AC_OUTPUT
 

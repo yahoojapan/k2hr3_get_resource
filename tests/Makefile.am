@@ -17,9 +17,9 @@
 # REVISION:
 #
 
-SUBDIRS = src buildutils tests
-ACLOCAL_AMFLAGS = -I m4
-EXTRA_DIST = RELEASE_VERSION @CONFIGURECUSTOM@
+TESTS = test.sh
+
+EXTRA_DIST = test.sh
 
 #
 # Local variables:

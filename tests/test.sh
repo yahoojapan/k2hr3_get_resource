@@ -24,12 +24,14 @@
 SCRIPTNAME=`basename $0`
 SCRIPTDIR=`dirname $0`
 SCRIPTDIR=`cd ${SCRIPTDIR}; pwd`
+SRCTOPDIR=`cd ${SCRIPTDIR}/..; pwd`
+SRCDIR=`cd ${SRCTOPDIR}/src; pwd`
 
 #
 # Test scripts
 #
 RESULT=0
-TARGET_SCRIPTS=`ls -1 ${SCRIPTDIR}/*`
+TARGET_SCRIPTS=`ls -1 ${SRCDIR}/*`
 for _target_script in ${TARGET_SCRIPTS}; do
 	_target_script_name=`basename ${_target_script}`
 	if [ "X${SCRIPTNAME}" = "X${_target_script_name}" ]; then

@@ -17,13 +17,10 @@
 # REVISION:
 #
 
-TESTS = test.sh
-
 EXTRA_DIST =	k2hr3-get-resource.timer \
 				k2hr3-get-resource.service \
 				k2hr3-get-resource-helper \
-				k2hr3-get-resource-helper.conf \
-				test.sh
+				k2hr3-get-resource-helper.conf
 
 #
 # Local variables:
