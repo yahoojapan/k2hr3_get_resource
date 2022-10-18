@@ -28,6 +28,7 @@ AM_INIT_AUTOMAKE()
 # Checks for programs.
 #
 AC_PROG_AWK
+AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
@@ -68,13 +69,12 @@ AC_SUBST([DEV_NAME], "$(echo ${DEBFULLNAME:-"${custom_dev_name}"})")
 #
 AC_SUBST([RPMCHANGELOG], "`$(pwd)/buildutils/make_rpm_changelog.sh $(pwd)/ChangeLog`")
 AC_SUBST([SHORTDESC], "Get K2HR3 Resource Helper for Systemd service")
-AC_SUBST([PKG_VERSION], "`$(pwd)/buildutils/make_variables.sh -pkg_version`")
+AC_SUBST([PKG_VERSION], "`$(pwd)/buildutils/make_variables.sh --pkg_version`")
 AC_SUBST([PKGLICENSE], "`grep License COPYING | sed 's/ License//g'`")
 AC_SUBST([DEBCOPYING], "`tail -n +5 COPYING | sed 's/^$/./g' | sed 's/^/ /g'`")
-AC_SUBST([DEBHELPER_DEP], "`$(pwd)/buildutils/make_variables.sh -debhelper_dep`")
-AC_SUBST([RPMPKG_GROUP], ["`$(pwd)/buildutils/make_variables.sh -rpmpkg_group | sed 's#NEEDRPMGROUP#Group: Applications/Other#g'`"])
+AC_SUBST([DEBHELPER_DEP], "`$(pwd)/buildutils/make_variables.sh --debhelper_dep_with_systemd`")
+AC_SUBST([RPMPKG_GROUP], ["`$(pwd)/buildutils/make_variables.sh --rpmpkg_group | sed 's#NEEDRPMGROUP#Group: Applications/Other#g'`"])
 AC_SUBST([CONFIGUREWITHOPT], "")
-AM_SUBST_NOTMAKE([CURRENTREV])
 AM_SUBST_NOTMAKE([RPMCHANGELOG])
 AM_SUBST_NOTMAKE([SHORTDESC])
 AM_SUBST_NOTMAKE([DEBCOPYING])
@@ -96,6 +96,7 @@ AC_CONFIG_FILES([Makefile
 				buildutils/Makefile
 				buildutils/control
 				buildutils/copyright
+				buildutils/rules
 				buildutils/k2hr3-get-resource.spec
 				tests/Makefile])
 
