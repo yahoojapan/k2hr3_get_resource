@@ -21,51 +21,54 @@
 #
 # Common variables
 #
-SCRIPTNAME=`basename $0`
-SCRIPTDIR=`dirname $0`
-SCRIPTDIR=`cd ${SCRIPTDIR}; pwd`
-SRCTOPDIR=`cd ${SCRIPTDIR}/..; pwd`
-SRCDIR=`cd ${SRCTOPDIR}/src; pwd`
+PRGNAME=$(basename "${0}")
+SCRIPTDIR=$(dirname "${0}")
+SRCTOP=$(cd "${SCRIPTDIR}/.." || exit 1; pwd)
+SRCDIR=$(cd "${SRCTOP}/src" || exit 1; pwd)
 
 #
 # Test scripts
 #
 RESULT=0
-TARGET_SCRIPTS=`ls -1 ${SRCDIR}/*`
-for _target_script in ${TARGET_SCRIPTS}; do
-	_target_script_name=`basename ${_target_script}`
-	if [ "X${SCRIPTNAME}" = "X${_target_script_name}" ]; then
+for _target_script in "${SRCDIR}"/*; do
+	_target_script_name=$(basename "${_target_script}")
+
+	if [ -z "${_target_script_name}" ] || [ "${PRGNAME}" = "${_target_script_name}" ]; then
 		continue
 	fi
 
 	IS_BASH=0
-	head -1 ${_target_script} | grep '^#!/bin/sh' >/dev/null 2>&1
-	if [ $? -ne 0 ]; then
-		head -1 ${_target_script} | grep '^#!/bin/bash' >/dev/null 2>&1
-		if [ $? -ne 0 ]; then
-			if [ ! -x ${_target_script} ]; then
+	if head -1 "${_target_script}" | grep -q '^#!/bin/sh'; then
+		IS_BASH=0
+	else
+		if head -1 "${_target_script}" | grep -q '^#!/bin/bash'; then
+			IS_BASH=1
+		else
+			if [ ! -x "${_target_script}" ]; then
 				continue
 			fi
-		else
-			IS_BASH=1
 		fi
 	fi
 
-	echo "Checking ${_target_script} :"
-	if [ ${IS_BASH} -ne 1 ]; then
-		/bin/sh -n ${_target_script}
+	IS_ERROR=0
+	if [ "${IS_BASH}" -ne 1 ]; then
+		if ! /bin/sh -n "${_target_script}"; then
+			IS_ERROR=1
+		fi
 	else
-		/bin/bash -n ${_target_script}
+		if ! /bin/bash -n "${_target_script}"; then
+			IS_ERROR=1
+		fi
 	fi
-	if [ $? -ne 0 ]; then
-		echo "   ---> Error."
+	if [ "${IS_ERROR}" -ne 0 ]; then
+		echo "Checking ${_target_script} :   ---> Error."
 		RESULT=1
 	else
-		echo "   ---> OK."
+		echo "Checking ${_target_script} :   ---> OK."
 	fi
 done
 
-exit ${RESULT}
+exit "${RESULT}"
 
 #
 # Local variables:
