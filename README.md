@@ -8,11 +8,11 @@ K2HR3 Get Resource(K2HR3 Utilities)
 [![debian packages](https://img.shields.io/badge/deb-packagecloud.io-844fec.svg)](https://packagecloud.io/antpickax/stable)
 [![RPM packages](https://img.shields.io/badge/rpm-packagecloud.io-844fec.svg)](https://packagecloud.io/antpickax/stable)
 
-## **K2HR3** - **K2H**dkc based **R**esource and **R**oles and policy **R**ules
+### **K2HR3** - **K2H**dkc based **R**esource and **R**oles and policy **R**ules
 
 ![K2HR3 system](https://k2hr3.antpick.ax/images/top_k2hr3.png)
 
-### K2HR3 System Overview
+#### K2HR3 System Overview
 **K2HR3** (**K2H**dkc based **R**esource and **R**oles and policy **R**ules) is one of extended **RBAC** (**R**ole **B**ased **A**ccess **C**ontrol) system.  
 K2HR3 works as RBAC in cooperation with **OpenStack** which is one of **IaaS**(Infrastructure as a Service), and also provides useful functions for using RBAC.  
 
@@ -26,7 +26,7 @@ K2HR3 provides **+SERVICE** feature, it **strongly supports** user system, funct
 
 K2HR3 is built [k2hdkc](https://github.com/yahoojapan/k2hdkc), [k2hash](https://github.com/yahoojapan/k2hash), [chmpx](https://github.com/yahoojapan/chmpx) and [k2hash transaction plugin](https://github.com/yahoojapan/k2htp_dtor) components by [AntPickax](https://antpick.ax/).
 
-## K2HR3 Get Resource(K2HR3 Utilities)
+### K2HR3 Get Resource(K2HR3 Utilities)
 K2HR3 Get Resource is a Systemd Timer Service for retrieving RESOURCE data from [K2HR3](https://k2hr3.antpick.ax/) System, this is one of utility for it.
 
 - Systemd timer service, which starts regularly.
@@ -34,7 +34,7 @@ K2HR3 Get Resource is a Systemd Timer Service for retrieving RESOURCE data from 
 - Get K2HR3 resource related to the role for the virtual machine.
 - Use the common directory /etc/antpickax.
 
-## Documents
+### Documents
 [K2HR3 Document](https://k2hr3.antpick.ax/index.html)  
 [K2HR3 Web Application Usage](https://k2hr3.antpick.ax/usage_app.html)  
 [K2HR3 Command Line Interface Usage](https://k2hr3.antpick.ax/cli.html)  
@@ -52,7 +52,7 @@ K2HR3 Get Resource is a Systemd Timer Service for retrieving RESOURCE data from 
 
 [About AntPickax](https://antpick.ax/)  
 
-## Repositories
+### Repositories
 [K2HR3 main repository](https://github.com/yahoojapan/k2hr3)  
 [K2HR3 Web Application repository](https://github.com/yahoojapan/k2hr3_app)  
 [K2HR3 Command Line Interface repository](https://github.com/yahoojapan/k2hr3_cli)  
