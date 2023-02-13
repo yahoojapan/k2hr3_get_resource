@@ -1,3 +1,19 @@
+k2hr3-get-resource (1.0.1) unstable; urgency=low
+
+  * Changed CI OSs and added Alpine OS - #15
+  * Updated header and footer in comment lines - #14
+  * Updated issue/pullrequest templates and README.md - #13
+  * Added ShellCheck processing - #12
+  * Eliminated unnecessary copies in build_helper.sh - #11
+  * Updated github actions process and support os, and fixed bugs - #10
+  * Updated debian_build.sh for grep parameter and updated configure.ac - #9
+  * Updated common build scripts - #8
+  * Updated Antpickax common scripts and tools under the buildutils directory - #7
+  * Separated the test files into the tests directory - #6
+  * Enabled external customization of configure.ac and fixed for building - #5
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Mon, 13 Feb 2023 18:51:46 +0900
+
 k2hr3-get-resource (1.0.0) unstable; urgency=low
 
   * Updated README.md for adding k2hr3 cli - #2
