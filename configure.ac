@@ -99,7 +99,8 @@ AC_CONFIG_FILES([Makefile
 				buildutils/copyright
 				buildutils/rules
 				buildutils/k2hr3-get-resource.spec
-				tests/Makefile])
+				tests/Makefile
+				buildutils/APKBUILD.templ])
 
 AC_OUTPUT
 

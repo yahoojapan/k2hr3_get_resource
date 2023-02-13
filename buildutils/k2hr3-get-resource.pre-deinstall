@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # K2HR3 Utilities - Get K2HR3 Resource Helper for Systemd service
 #
@@ -13,19 +14,29 @@
 # the license file that was distributed with this source code.
 #
 # AUTHOR:   Takeshi Nakatani
-# CREATE:   Wed Jan 20 2021
+# CREATE:   Mon, 13 Feb 2023
 # REVISION:
 #
 
-EXTRA_DIST =make_variables.sh \
-			make_release_version_file.sh \
-			make_rpm_changelog.sh \
-			debian_build.sh \
-			debian_build_copy.conf \
-			rpm_build.sh \
-			k2hr3-get-resource.install \
-			k2hr3-get-resource.post-install \
-			k2hr3-get-resource.pre-deinstall
+#---------------------------------------------------------------------
+# Unsetup Cron for ALPINE package
+#---------------------------------------------------------------------
+#
+# Common variables
+#
+K2HR3_GET_RESOURCE_HELPER_FILE="/usr/bin/k2hr3-get-resource-helper"
+CRONTAB_ROOT_FILE="/etc/crontabs/root"
+
+if [ ! -f "${CRONTAB_ROOT_FILE}" ]; then
+	echo "[ERROR] Not found crontab file(${CRONTAB_ROOT_FILE}) for root." 1>&2
+	exit 1
+fi
+
+if ! sed -i -e "s|^.*${K2HR3_GET_RESOURCE_HELPER_FILE}[[:space:]]*$||g" "${CRONTAB_ROOT_FILE}"; then
+	echo "[WARNING] Failed to unset root crontab, but continue..." 1>&2
+fi
+
+exit 0
 
 #
 # Local variables:
