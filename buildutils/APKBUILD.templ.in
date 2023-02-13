@@ -1,0 +1,119 @@
+#
+# K2HR3 Utilities - Get K2HR3 Resource Helper for Systemd service
+#
+# Copyright 2021 Yahoo Japan Corporation.
+#
+# K2HR3 is K2hdkc based Resource and Roles and policy Rules, gathers
+# common management information for the cloud.
+# K2HR3 can dynamically manage information as "who", "what", "operate".
+# These are stored as roles, resources, policies in K2hdkc, and the
+# client system can dynamically read and modify these information.
+#
+# For the full copyright and license information, please view
+# the license file that was distributed with this source code.
+#
+# AUTHOR:   Takeshi Nakatani
+# CREATE:   Wed, 8 Feb 2023
+# REVISION:
+#
+
+#---------------------------------------------------------------
+# Local varibales as antpickax template
+#---------------------------------------------------------------
+#
+# Set variables by configure
+#
+_git_domain="@GIT_DOMAIN@"
+_organization_name="@GIT_ORG@"
+_repository_name="@GIT_REPO@"
+
+#
+# Set variables by apk_build.sh
+#
+_package_revision=%%BUILD_NUMBER%%
+_configure_option=%%CONFIGUREOPT%%
+_source_archive_url=%%SOURCE_ARCHIVE_URL%%
+
+#---------------------------------------------------------------
+# Main variables for APKBUILD
+#---------------------------------------------------------------
+# Contributor: @DEV_NAME@ <@DEV_EMAIL@>
+# Maintainer: @DEV_NAME@ <@DEV_EMAIL@>
+
+# [NOTE]
+# The $_organization_name is "k2hr3_get_resource", but the $pkgname
+# should be "k2hr3-get-resource", so adjust with this variable.
+#
+pkgname="k2hr3-get-resource"
+pkgver=@PKG_VERSION@
+pkgrel=$_package_revision
+pkgdesc="@SHORTDESC@"
+
+url="https://k2hr3.antpick.ax/"
+arch="x86_64"
+license="MIT"
+
+depends="
+	curl
+"
+depends_dev=""
+makedepends="
+	$depends_dev
+	autoconf
+	automake
+	musl-locales
+	procps
+"
+
+install="
+	$pkgname.post-install
+	$pkgname.pre-deinstall
+"
+subpackages=""
+
+source="$pkgname-$pkgver.tar.gz%%SOURCE_ARCHIVE_URL%%"
+
+builddir="$srcdir/$pkgname-$pkgver"
+
+#---------------------------------------------------------------
+# Build functions for APKBUILD
+#---------------------------------------------------------------
+prepare() {
+	default_prepare
+	# this function can be omitted if no extra steps are needed
+}
+
+unpack() {
+	default_unpack
+
+	# [NOTE]
+	# A github release archive is unzipped as a directory with the
+	# repository name(k2hr3_get_resource) and version number.
+	# In this case, change the directory name to the package name
+	# (k2hr3-get-resource) instead of the repository name.
+	#
+	if [ -d "$_repository_name-$pkgver" ]; then
+		mv "$_repository_name-$pkgver" "$pkgname-$pkgver"
+	fi
+}
+
+build() {
+	if [ ! -f configure ]; then
+		./autogen.sh
+	fi
+	./configure --prefix=/usr $_configure_option
+	make
+}
+
+check() {
+	make check
+}
+
+package() {
+	install -Dm755 src/"$pkgname"-helper      "$pkgdir"/usr/bin/"$pkgname"-helper
+	install -Dm644 src/"$pkgname"-helper.conf "$pkgdir"/etc/antpickax/"$pkgname"-helper.conf
+}
+
+# [NOTE]
+# Subsequent lines print the checksum of the source archive.
+#

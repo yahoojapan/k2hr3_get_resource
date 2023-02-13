@@ -160,6 +160,7 @@ log_info()
 	print_message 1 "INFO" "$*"
 }
 
+# shellcheck disable=SC2317
 prn_err()
 {
 	print_message 2 "ERROR" "$*"
@@ -170,6 +171,7 @@ prn_warn()
 	print_message 2 "WARNING" "$*"
 }
 
+# shellcheck disable=SC2317
 prn_info()
 {
 	print_message 2 "INFO" "$*"
@@ -638,6 +640,14 @@ else
 	log_info "Start daemon process"
 
 	if [ "${USE_DAEMON}" -eq 1 ]; then
+		#
+		# Check systemctl command
+		#
+		if ! command -v systemctl >/dev/null 2>&1; then
+			log_err "Not found systemctl command, thus this daemon exits."
+			exit 1
+		fi
+
 		#
 		# Check old process
 		#
