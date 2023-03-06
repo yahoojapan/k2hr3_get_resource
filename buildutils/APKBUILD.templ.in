@@ -112,6 +112,9 @@ check() {
 package() {
 	install -Dm755 src/"$pkgname"-helper      "$pkgdir"/usr/bin/"$pkgname"-helper
 	install -Dm644 src/"$pkgname"-helper.conf "$pkgdir"/etc/antpickax/"$pkgname"-helper.conf
+
+	install -m 0777 -d "$pkgdir"/var/lib/antpickax
+	install -m 0777 -d "$pkgdir"/var/run/antpickax
 }
 
 # [NOTE]

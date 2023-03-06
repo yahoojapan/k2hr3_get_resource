@@ -82,6 +82,8 @@ install -D -m 644 src/@PACKAGE_NAME@.timer %{buildroot}/lib/systemd/system/@PACK
 install -D -m 644 src/@PACKAGE_NAME@.service %{buildroot}/lib/systemd/system/@PACKAGE_NAME@.service
 install -D -m 755 src/@PACKAGE_NAME@-helper %{buildroot}/usr/libexec/@PACKAGE_NAME@-helper
 install -D -m 644 src/@PACKAGE_NAME@-helper.conf %{buildroot}/etc/antpickax/@PACKAGE_NAME@-helper.conf
+mkdir -p %{buildroot}/var/lib/antpickax
+mkdir -p %{buildroot}/var/run/antpickax
 
 %if %{make_check}
 %check
@@ -95,6 +97,8 @@ install -D -m 644 src/@PACKAGE_NAME@-helper.conf %{buildroot}/etc/antpickax/@PAC
 /lib/systemd/system/@PACKAGE_NAME@.service
 /usr/libexec/@PACKAGE_NAME@-helper
 /etc/antpickax/*
+%dir %attr(0777,root,root) /var/lib/antpickax
+%dir %attr(0777,root,root) /var/run/antpickax
 
 %preun
 %systemd_preun @PACKAGE_NAME@.timer
