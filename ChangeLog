@@ -1,3 +1,10 @@
+k2hr3-get-resource (1.0.3) unstable; urgency=low
+
+  * Updated tool scripts and support OSs - #20
+  * Fixed .gitignore to exclude APKBUILD.templ - #19
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Fri, 01 Sep 2023 09:34:35 +0900
+
 k2hr3-get-resource (1.0.2) unstable; urgency=low
 
   * Updated building/packaging logic for ALPINE - #17
