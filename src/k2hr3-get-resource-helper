@@ -101,7 +101,7 @@ else
 	RESOURCE_PATH=
 fi
 if [ -n "${RESOURCE_PATH}" ]; then
-	OUTPUT_FILE=$(sed -e 's#[:/]# #g' "${RESOURCE_PATH}" | awk '{print $NF}')
+	OUTPUT_FILE=$(echo "${RESOURCE_PATH}" | sed -e 's#[:/]# #g' | awk '{print $NF}')
 else
 	OUTPUT_FILE=
 fi
@@ -292,7 +292,7 @@ get_value()
 		#
 		# Search key in override configutation file
 		#
-		if ! _GETVALUE_OVERRIDE_VALUE=$(extract_value "${_GETVALUE_OVERRIDE_PAIRKEY}" "${_GETVALUE_OVERRIDE_FILE}"); then
+		if _GETVALUE_OVERRIDE_VALUE=$(extract_value "${_GETVALUE_OVERRIDE_PAIRKEY}" "${_GETVALUE_OVERRIDE_FILE}"); then
 			#
 			# Found key and parse it
 			#
@@ -434,9 +434,10 @@ if ! _TMP_VALUE=$(get_value "RESOURCE_PATH" "${CONFDIR}/${SCRIPT_CONF_FILE}" "${
 		exit 1
 	fi
 	log_info "There is no configuration value(RESOURCE_PATH) in configuration files, thus use default value(${RESOURCE_PATH})"
-
-elif [ -n "${_TMP_VALUE}" ]; then
-	RESOURCE_PATH="${_TMP_VALUE}"
+else
+	if [ -n "${_TMP_VALUE}" ]; then
+		RESOURCE_PATH="${_TMP_VALUE}"
+	fi
 fi
 if [ -z "${RESOURCE_PATH}" ]; then
 	log_err "The configuration value(RESOURCE_PATH) is empty."
@@ -452,9 +453,10 @@ if ! _TMP_VALUE=$(get_value "OUTPUT_FILE" "${CONFDIR}/${SCRIPT_CONF_FILE}" "${CO
 		exit 1
 	fi
 	log_info "There is no configuration value(OUTPUT_FILE) in configuration files, thus use default value(${OUTPUT_FILE})"
-
-elif [ -n "${_TMP_VALUE}" ]; then
-	OUTPUT_FILE="${_TMP_VALUE}"
+else
+	if [ -n "${_TMP_VALUE}" ]; then
+		OUTPUT_FILE="${_TMP_VALUE}"
+	fi
 fi
 if [ -z "${OUTPUT_FILE}" ]; then
 	log_err "The configuration value(OUTPUT_FILE) is empty."
@@ -470,9 +472,10 @@ if ! _TMP_VALUE=$(get_value "OUTPUT_DIR" "${CONFDIR}/${SCRIPT_CONF_FILE}" "${CON
 		exit 1
 	fi
 	log_info "There is no configuration value(OUTPUT_DIR) in configuration files, thus use default value(${OUTPUT_DIR})"
-
-elif [ -n "${_TMP_VALUE}" ]; then
-	OUTPUT_DIR="${_TMP_VALUE}"
+else
+	if [ -n "${_TMP_VALUE}" ]; then
+		OUTPUT_DIR="${_TMP_VALUE}"
+	fi
 fi
 
 #
@@ -484,14 +487,15 @@ if ! _TMP_VALUE=$(get_value "USE_DAEMON" "${CONFDIR}/${SCRIPT_CONF_FILE}" "${CON
 		exit 1
 	fi
 	log_info "There is no configuration value(USE_DAEMON) in configuration files, thus use default value(${USE_DAEMON})"
-
-elif [ -n "${_TMP_VALUE}" ]; then
-	if [ "${_TMP_VALUE}" = "true" ] || [ "${_TMP_VALUE}" = "TRUE" ] || [ "${_TMP_VALUE}" = "1" ]; then
-		USE_DAEMON=1
-	elif [ "${_TMP_VALUE}" = "false" ] || [ "${_TMP_VALUE}" = "FALSE" ] || [ "${_TMP_VALUE}" = "0" ]; then
-		USE_DAEMON=0
-	else
-		log_warn "USE_DAEMON value in configuration is wrong value(${_TMP_VALUE}), then use default(${USE_DAEMON})."
+else
+	if [ -n "${_TMP_VALUE}" ]; then
+		if [ "${_TMP_VALUE}" = "true" ] || [ "${_TMP_VALUE}" = "TRUE" ] || [ "${_TMP_VALUE}" = "1" ]; then
+			USE_DAEMON=1
+		elif [ "${_TMP_VALUE}" = "false" ] || [ "${_TMP_VALUE}" = "FALSE" ] || [ "${_TMP_VALUE}" = "0" ]; then
+			USE_DAEMON=0
+		else
+			log_warn "USE_DAEMON value in configuration is wrong value(${_TMP_VALUE}), then use default(${USE_DAEMON})."
+		fi
 	fi
 fi
 
