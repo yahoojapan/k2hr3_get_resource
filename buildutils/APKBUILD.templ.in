@@ -54,6 +54,7 @@ arch="x86_64"
 license="MIT"
 
 depends="
+	procps
 	curl
 "
 depends_dev=""
@@ -62,7 +63,6 @@ makedepends="
 	autoconf
 	automake
 	musl-locales
-	procps
 "
 
 install="
@@ -110,6 +110,9 @@ check() {
 }
 
 package() {
+	#
+	# Install helper files
+	#
 	install -Dm755 src/"$pkgname"-helper      "$pkgdir"/usr/bin/"$pkgname"-helper
 	install -Dm644 src/"$pkgname"-helper.conf "$pkgdir"/etc/antpickax/"$pkgname"-helper.conf
 
