@@ -1,3 +1,9 @@
+k2hr3-get-resource (1.0.8) unstable; urgency=low
+
+  * Changed supported OS and modified some codes - #30
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Thu, 14 Nov 2024 10:02:57 +0900
+
 k2hr3-get-resource (1.0.7) unstable; urgency=low
 
   * Changed support OS, etc - #28
