@@ -1,3 +1,9 @@
+k2hr3-get-resource (1.0.9) unstable; urgency=low
+
+  * Updated cron startup process for ALPINE and fixed bugs - #32
+
+ -- Takeshi Nakatani <ggtakec@gmail.com>  Fri, 15 Nov 2024 14:47:12 +0900
+
 k2hr3-get-resource (1.0.8) unstable; urgency=low
 
   * Changed supported OS and modified some codes - #30
