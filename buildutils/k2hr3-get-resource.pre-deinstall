@@ -24,7 +24,7 @@
 #
 # Common variables
 #
-K2HR3_GET_RESOURCE_HELPER_FILE="/usr/bin/k2hr3-get-resource-helper"
+K2HR3_GET_RESOURCE_HELPER_FILE="/usr/libexec/k2hr3-get-resource-helper"
 CRONTAB_ROOT_FILE="/etc/crontabs/root"
 
 if [ ! -f "${CRONTAB_ROOT_FILE}" ]; then
@@ -32,7 +32,7 @@ if [ ! -f "${CRONTAB_ROOT_FILE}" ]; then
 	exit 1
 fi
 
-if ! sed -i -e "s|^.*${K2HR3_GET_RESOURCE_HELPER_FILE}[[:space:]]*$||g" "${CRONTAB_ROOT_FILE}"; then
+if ! sed -i -e "s|^.*${K2HR3_GET_RESOURCE_HELPER_FILE}[[:space:]]*.*$||g" "${CRONTAB_ROOT_FILE}"; then
 	echo "[WARNING] Failed to unset root crontab, but continue..." 1>&2
 fi
 
