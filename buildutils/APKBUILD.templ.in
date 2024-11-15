@@ -113,7 +113,7 @@ package() {
 	#
 	# Install helper files
 	#
-	install -Dm755 src/"$pkgname"-helper      "$pkgdir"/usr/bin/"$pkgname"-helper
+	install -Dm755 src/"$pkgname"-helper      "$pkgdir"/usr/libexec/"$pkgname"-helper
 	install -Dm644 src/"$pkgname"-helper.conf "$pkgdir"/etc/antpickax/"$pkgname"-helper.conf
 
 	install -m 0777 -d "$pkgdir"/var/lib/antpickax

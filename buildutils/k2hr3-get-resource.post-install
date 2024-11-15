@@ -24,7 +24,8 @@
 #
 # Common variables
 #
-K2HR3_GET_RESOURCE_HELPER_FILE="/usr/bin/k2hr3-get-resource-helper"
+K2HR3_GET_RESOURCE_HELPER_FILE="/usr/libexec/k2hr3-get-resource-helper"
+K2HR3_GET_RESOURCE_HELPER_OPTION="--cron"
 CRONTAB_ROOT_FILE="/etc/crontabs/root"
 
 #
@@ -43,7 +44,7 @@ fi
 #
 # Setup crontab for root
 #
-if ! echo "* * * * * /bin/sh ${K2HR3_GET_RESOURCE_HELPER_FILE}" >> "${CRONTAB_ROOT_FILE}" 2>/dev/null; then
+if ! echo "*/15 * * * * /bin/sh ${K2HR3_GET_RESOURCE_HELPER_FILE} ${K2HR3_GET_RESOURCE_HELPER_OPTION}" >> "${CRONTAB_ROOT_FILE}" 2>/dev/null; then
 	echo "[ERROR] Failed to set root crontab." 1>&2
 	exit 1
 fi

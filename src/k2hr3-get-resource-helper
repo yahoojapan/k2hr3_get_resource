@@ -26,23 +26,9 @@ BASE_PRGNAME=$(echo "${PRGNAME}" | sed -e 's/\.*$//g')
 SCRIPTDIR=$(dirname "${0}")
 SCRIPTDIR=$(cd "${SCRIPTDIR}" || exit 1; pwd)
 
-#
-# Options
-#
-# [NOTE]
-# The option only accepts "-daemon".
-# If it is passed "-daemon" option, it acts as a daemon that waits
-# until the systemd k2hr3-get-resource.timer is disabled.
-# When k2hr3-get-resource.timer is disabled, the file that output the
-# resource is deleted and the process is terminated.
-#
-if [ -n "$1" ] && [ "$1" = "-daemon" ]; then
-	SCRIPT_MODE="daemon"
-else
-	SCRIPT_MODE="normal"
-fi
-USE_DAEMON=1
-
+#---------------------------------------------------------------------
+# Variables
+#---------------------------------------------------------------------
 #
 # systemd timer name
 #
@@ -357,6 +343,55 @@ get_value()
 }
 
 #---------------------------------------------------------------------
+# Parse Option
+#---------------------------------------------------------------------
+OPT_DAEMON=0
+OPT_CRON=0
+
+while [ $# -ne 0 ]; do
+	if [ -z "$1" ]; then
+		break;
+
+	elif echo "$1" | grep -q -i -e "^--daemon$" -e "^-daemon$"; then
+		if [ "${OPT_DAEMON}" -ne 0 ]; then
+			log_err "Already specified --daemon option."
+			exit 1
+		fi
+		OPT_DAEMON=1
+
+	elif echo "$1" | grep -q -i -e "^--cron" -e "^-cron"; then
+		if [ "${OPT_CRON}" -ne 0 ]; then
+			log_err "Already specified --cron option."
+			exit 1
+		fi
+		OPT_CRON=1
+
+	else
+		log_err "Unknown option : \"$1\""
+		exit 1
+	fi
+	shift
+done
+
+# [NOTE]
+# The option only accepts "-daemon".
+# If it is passed "-daemon" option, it acts as a daemon that waits
+# until the systemd k2hr3-get-resource.timer is disabled.
+# When k2hr3-get-resource.timer is disabled, the file that output the
+# resource is deleted and the process is terminated.
+#
+if [ "${OPT_DAEMON}" -eq 1 ]; then
+	SCRIPT_MODE="daemon"
+else
+	SCRIPT_MODE="normal"
+fi
+
+#
+# Default
+#
+USE_DAEMON=1
+
+#---------------------------------------------------------------------
 # Load configuration and check
 #---------------------------------------------------------------------
 #
@@ -500,6 +535,27 @@ else
 fi
 
 #
+# USE_CRON
+#
+if ! _TMP_VALUE=$(get_value "USE_CRON" "${CONFDIR}/${SCRIPT_CONF_FILE}" "${CONFDIR}/${OVERRIDE_FILE}"); then
+	if [ -z "${USE_CRON}" ]; then
+		log_err "There is no configuration value(USE_CRON) in configuration files and default value is empty."
+		exit 1
+	fi
+	log_info "There is no configuration value(USE_CRON) in configuration files, thus use default value(${USE_CRON})"
+else
+	if [ -n "${_TMP_VALUE}" ]; then
+		if [ "${_TMP_VALUE}" = "true" ] || [ "${_TMP_VALUE}" = "TRUE" ] || [ "${_TMP_VALUE}" = "1" ]; then
+			USE_CRON=1
+		elif [ "${_TMP_VALUE}" = "false" ] || [ "${_TMP_VALUE}" = "FALSE" ] || [ "${_TMP_VALUE}" = "0" ]; then
+			USE_CRON=0
+		else
+			log_warn "USE_CRON value in configuration is wrong value(${_TMP_VALUE}), then use default(${USE_CRON})."
+		fi
+	fi
+fi
+
+#
 # Check K2HR3 variables
 #	K2HR3_ROLE_TOKEN
 #	K2HR3_API_HOST_URI
@@ -516,6 +572,17 @@ if [ -f "${K2HR3_API_HOST_URI_FILE}" ]; then
 else
 	log_err "There is no K2HR3 REST API URI file(${K2HR3_API_HOST_URI_FILE})."
 	exit 1
+fi
+
+#
+# Check launching from cron
+#
+if [ "${OPT_CRON}" -eq 1 ] && [ "${USE_CRON}" -eq 0 ]; then
+	#
+	# Nothing to do
+	#
+	log_info "The process was started via cron, but since cron startup is disabled, the execution will be canceled."
+	exit 0
 fi
 
 #---------------------------------------------------------------------
