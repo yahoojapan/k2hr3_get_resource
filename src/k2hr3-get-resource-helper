@@ -602,7 +602,7 @@ if [ "${SCRIPT_MODE}" != "daemon" ]; then
 
 		if [ $$ -ne "${OLD_PROCESS_PID}" ]; then
 			# shellcheck disable=SC2009
-			if ps -p "${OLD_PROCESS_PID}" | grep -v PID | grep -q -v -i 'defunct'; then
+			if ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${OLD_PROCESS_PID}$" || exit 1 && exit 0 ); then
 				log_err "Already process PID(${OLD_PROCESS_PID}) running, thus this script exits."
 				exit 1
 			fi
@@ -681,7 +681,7 @@ if [ "${SCRIPT_MODE}" != "daemon" ]; then
 			OLD_DAEMON_PROCESS_PID=$(cat "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}")
 
 			# shellcheck disable=SC2009
-			if ! ps -p "${OLD_DAEMON_PROCESS_PID}" | grep -v PID | grep -q -v -i 'defunct'; then
+			if ! ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${OLD_DAEMON_PROCESS_PID}$" || exit 1 && exit 0 ); then
 				rm -f "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}"
 				IS_NEED_DAEMON_RUN=1
 			fi
@@ -726,7 +726,7 @@ else
 			OLD_DAEMON_PROCESS_PID=$(cat "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}")
 
 			# shellcheck disable=SC2009
-			if ps -p "${OLD_DAEMON_PROCESS_PID}" | grep -v PID | grep -q -v -i 'defunct'; then
+			if ( ps -o pid,stat ax 2>/dev/null | grep -v 'PID' | awk '$2~/^[^Z]/ { print $1 }' | grep -q "^${OLD_DAEMON_PROCESS_PID}$" || exit 1 && exit 0 ); then
 				log_err "Already process PID(${OLD_DAEMON_PROCESS_PID}) running, thus this daemon exits."
 				exit 1
 			fi
