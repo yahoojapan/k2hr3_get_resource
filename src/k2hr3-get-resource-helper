@@ -146,7 +146,7 @@ log_info()
 	print_message 1 "INFO" "$*"
 }
 
-# shellcheck disable=SC2317
+# shellcheck disable=SC2317,SC2329
 prn_err()
 {
 	print_message 2 "ERROR" "$*"
@@ -157,7 +157,7 @@ prn_warn()
 	print_message 2 "WARNING" "$*"
 }
 
-# shellcheck disable=SC2317
+# shellcheck disable=SC2317,SC2329
 prn_info()
 {
 	print_message 2 "INFO" "$*"
