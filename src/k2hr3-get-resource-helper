@@ -75,13 +75,11 @@ SCRIPT_LOGFILE=""
 # [NOTE]
 # Set/Load default resource yrn path and output directory/file name.
 #
-
-# K2HR3 related files
 K2HR3_ROLE_TOKEN_FILE="${CONFDIR}/k2hr3-role-token"
 K2HR3_ROLE_NAME_FILE="${CONFDIR}/k2hr3-role-name"
 K2HR3_API_HOST_URI_FILE="${CONFDIR}/k2hr3-api-uri"
 
-if [ -f "${K2HR3_ROLE_NAME_FILE}" ]; then
+if [ -d "${CONFDIR}" ] && [ ! -L "${CONFDIR}" ] && [ -f "${K2HR3_ROLE_NAME_FILE}" ] && [ ! -L "${K2HR3_ROLE_NAME_FILE}" ]; then
 	RESOURCE_PATH=$(sed -e 's/:[rR][oO][lL][eE]:/:resource:/g' "${K2HR3_ROLE_NAME_FILE}")
 else
 	RESOURCE_PATH=
@@ -92,6 +90,13 @@ else
 	OUTPUT_FILE=
 fi
 OUTPUT_DIR="${CONFDIR}"
+
+#
+# Set limit for getting resources
+#
+GET_RESULT_CONNECT_TIMEOUT=60
+GET_RESULT_MAX_TIME=600
+GET_RESULT_MAX_BYTES=$((16 * 1024 * 1024))
 
 #---------------------------------------------------------------------
 # Utilitiy functions
@@ -556,18 +561,38 @@ else
 fi
 
 #
+# Check Directories and Files
+#
+if [ ! -d "${CONFDIR}" ] || [ -L "${CONFDIR}" ]; then
+	log_err "Configuration directory(${CONFDIR}) is not existed or symbolic link."
+	exit 1
+fi
+if [ ! -d "${OUTPUT_DIR}" ] || [ -L "${OUTPUT_DIR}" ]; then
+	log_err "Output files directory(${OUTPUT_DIR}) is not existed or symbolic link."
+	exit 1
+fi
+if [ ! -d "${PIDDIR}" ] || [ -L "${PIDDIR}" ]; then
+	log_err "Output pid file directory(${PIDDIR}) is not existed or symbolic link."
+	exit 1
+fi
+if [ -L "${OUTPUT_DIR}/${OUTPUT_FILE}" ]; then
+	log_err "Output file(${OUTPUT_FILE}) is symbolic link."
+	exit 1
+fi
+
+#
 # Check K2HR3 variables
 #	K2HR3_ROLE_TOKEN
 #	K2HR3_API_HOST_URI
 #
 #
-if [ -f "${K2HR3_ROLE_TOKEN_FILE}" ]; then
+if [ -d "${CONFDIR}" ] && [ ! -L "${CONFDIR}" ] && [ -f "${K2HR3_ROLE_TOKEN_FILE}" ] && [ ! -L "${K2HR3_ROLE_TOKEN_FILE}" ]; then
 	K2HR3_ROLE_TOKEN=$(cat "${K2HR3_ROLE_TOKEN_FILE}")
 else
 	log_err "There is no K2HR3 role token file(${K2HR3_ROLE_TOKEN_FILE})."
 	exit 1
 fi
-if [ -f "${K2HR3_API_HOST_URI_FILE}" ]; then
+if [ -d "${CONFDIR}" ] && [ ! -L "${CONFDIR}" ] && [ -f "${K2HR3_API_HOST_URI_FILE}" ] && [ ! -L "${K2HR3_API_HOST_URI_FILE}" ]; then
 	K2HR3_API_HOST_URI=$(cat "${K2HR3_API_HOST_URI_FILE}")
 else
 	log_err "There is no K2HR3 REST API URI file(${K2HR3_API_HOST_URI_FILE})."
@@ -597,7 +622,7 @@ if [ "${SCRIPT_MODE}" != "daemon" ]; then
 	#
 	# Check old process
 	#
-	if [ -f "${PIDDIR}/${SCRIPT_PIDFILE}" ]; then
+	if [ -f "${PIDDIR}/${SCRIPT_PIDFILE}" ] && [ ! -L "${PIDDIR}/${SCRIPT_PIDFILE}" ]; then
 		OLD_PROCESS_PID=$(cat "${PIDDIR}/${SCRIPT_PIDFILE}")
 
 		if [ $$ -ne "${OLD_PROCESS_PID}" ]; then
@@ -606,6 +631,11 @@ if [ "${SCRIPT_MODE}" != "daemon" ]; then
 				log_err "Already process PID(${OLD_PROCESS_PID}) running, thus this script exits."
 				exit 1
 			fi
+		fi
+	elif [ -L "${PIDDIR}/${SCRIPT_PIDFILE}" ]; then
+		if ! rm "${PIDDIR}/${SCRIPT_PIDFILE}" >/dev/null 2>&1; then
+			log_err "Old PID file(${PIDDIR}/${SCRIPT_PIDFILE}) is symbolic link, and could not remove it."
+			exit 1
 		fi
 	fi
 	#
@@ -616,7 +646,7 @@ if [ "${SCRIPT_MODE}" != "daemon" ]; then
 	#
 	# Check CUK(Instance ID)
 	#
-	if [ ! -f "${INSTANCE_ID_FILE}" ]; then
+	if [ ! -d "${CLOUDINIT_DATA_DIR}" ] || [ -L "${CLOUDINIT_DATA_DIR}" ] || [ ! -f "${INSTANCE_ID_FILE}" ] || [ -L "${INSTANCE_ID_FILE}" ]; then
 		log_warn "Not found ${INSTANCE_ID_FILE} file for CUK."
 		INSTANCE_ID=
 	else
@@ -629,17 +659,51 @@ if [ "${SCRIPT_MODE}" != "daemon" ]; then
 	#
 	# Get resource
 	#
-	if ! GET_RESULT=$(curl -s -S -X GET -H "Content-Type: application/json" -H "x-auth-token: R=${K2HR3_ROLE_TOKEN}" "${K2HR3_API_HOST_URI}/v1/resource/${RESOURCE_PATH}" 2>&1); then
-		log_err "Failed getting resource(path: ${RESOURCE_PATH})."
+	# Make temporary file path
+	if ! TEMP_GET_RESULT_FILE=$(mktemp "/tmp/${BASE_PRGNAME}.XXXXXX" 2>/dev/null); then
+		log_err "Failed create temporary file for getting resource."
+		rm -f "${PIDDIR}/${SCRIPT_PIDFILE}"
+		exit 1
+	fi
+
+	# Set trap for removing temporary file
+	# (By enclosing it in single quotes, we ensure that the value of the TEMP_GET_RESULT_FILE
+	#  variable used is the one that exists at the very moment the script terminates.)
+	#
+	trap 'rm -f "${TEMP_GET_RESULT_FILE}"' EXIT INT TERM
+
+	# Get resources
+	if ! GET_RESULT_ERR=$({ printf 'header = "x-auth-token: R=%s"\n' "${K2HR3_ROLE_TOKEN}" | curl -s -S --fail --connect-timeout "${GET_RESULT_CONNECT_TIMEOUT}" --max-time "${GET_RESULT_MAX_TIME}" --max-filesize "${GET_RESULT_MAX_BYTES}" -X GET -K - -H "Content-Type: application/json" -o "${TEMP_GET_RESULT_FILE}" "${K2HR3_API_HOST_URI}/v1/resource/${RESOURCE_PATH}"; } 2>&1); then
+		log_err "Failed getting resource(path: ${RESOURCE_PATH}) by ${GET_RESULT_ERR}."
 		rm -f "${PIDDIR}/${SCRIPT_PIDFILE}"
 		exit 1
 	fi
 	log_info "Success accessing K2HR3 resource(${RESOURCE_PATH})"
 
+	# Check response
+	if [ ! -f "${TEMP_GET_RESULT_FILE}" ] || [ -L "${TEMP_GET_RESULT_FILE}" ] || [ ! -s "${TEMP_GET_RESULT_FILE}" ]; then
+		log_err "Failed getting resource(path: ${RESOURCE_PATH})."
+		rm -f "${PIDDIR}/${SCRIPT_PIDFILE}"
+		exit 1
+	fi
+	GET_RESULT_ACTUAL_BYTES=$(wc -c < "${TEMP_GET_RESULT_FILE}" | tr -d ' ')
+	if [ "${GET_RESULT_ACTUAL_BYTES}" -gt "${GET_RESULT_MAX_BYTES}" ]; then
+		log_err "The respose bytes of getting resource(path: ${RESOURCE_PATH}) exceeds limit(${GET_RESULT_MAX_BYTES} bytes)."
+		rm -f "${PIDDIR}/${SCRIPT_PIDFILE}"
+		exit 1
+	fi
+	GET_RESULT_FIRST_CHAR=$(tr -d ' \t\r\n' < "${TEMP_GET_RESULT_FILE}" | cut -c 1)
+	GET_RESULT_LAST_CHAR=$(tr -d ' \t\r\n' < "${TEMP_GET_RESULT_FILE}" | rev | cut -c 1)
+	if [ "${GET_RESULT_FIRST_CHAR}" != "{" ] || [ "${GET_RESULT_LAST_CHAR}" != "}" ]; then
+		log_err "The respose of getting resource(path: ${RESOURCE_PATH}) has wrong JSON format."
+		rm -f "${PIDDIR}/${SCRIPT_PIDFILE}"
+		exit 1
+	fi
+
 	# Check response(expect -> "result": true)
-	if ! echo "${GET_RESULT}" | grep -q -i '["]*RESULT["]*:[[:space:]]*TRUE[[:space:]]*,'; then
+	if ! grep -q -i '["]*RESULT["]*:[[:space:]]*TRUE[[:space:]]*,' "${TEMP_GET_RESULT_FILE}"; then
 		# Get error message(expect -> "message": "...")
-		GET_RESULT_MSG=$(echo "${GET_RESULT}" | sed -e 's/^.*["]*[mM][eE][sS][sS][aA][gG][eE]["]*:[[:space:]]*//g' -e 's/,.*$//g' -e 's/}.*//g' -e 's/"//g')
+		GET_RESULT_MSG=$(sed -e 's/^.*["]*[mM][eE][sS][sS][aA][gG][eE]["]*:[[:space:]]*//g' -e 's/,.*$//g' -e 's/}.*//g' -e 's/"//g' "${TEMP_GET_RESULT_FILE}")
 		log_err "Failed getting resource(path: ${RESOURCE_PATH}) with response(${GET_RESULT_MSG})."
 		rm -f "${PIDDIR}/${SCRIPT_PIDFILE}"
 		exit 1
@@ -653,7 +717,13 @@ if [ "${SCRIPT_MODE}" != "daemon" ]; then
 
 	# Put resource to temporary file with converting CR and instance id
 	TEMP_RESOURCE_FILE="/tmp/.$$_${OUTPUT_FILE}"
-	echo "${GET_RESULT}" | sed -e 's/^.*["]*[rR][eE][sS][oO][uU][rR][cC][eE]["]*:[[:space:]]*"//g' -e 's/"}$//g' -e 's/\\n/\n/g' -e "s/__SELF_INSTANCE_ID__/${INSTANCE_ID}/g" > "${TEMP_RESOURCE_FILE}" 2>/dev/null
+	if [ -L "${TEMP_RESOURCE_FILE}" ]; then
+		if ! rm "${TEMP_RESOURCE_FILE}" >/dev/null 2>&1; then
+			log_err "Temporary resource file(${TEMP_RESOURCE_FILE}) is symbolic link, and could not remove it."
+			exit 1
+		fi
+	fi
+	sed -e 's/^.*["]*[rR][eE][sS][oO][uU][rR][cC][eE]["]*:[[:space:]]*"//g' -e 's/"}$//g' -e 's/\\n/\n/g' -e "s/__SELF_INSTANCE_ID__/${INSTANCE_ID}/g" "${TEMP_GET_RESULT_FILE}" > "${TEMP_RESOURCE_FILE}" 2>/dev/null
 
 	# Check file differences
 	if ! diff "${TEMP_RESOURCE_FILE}" "${OUTPUT_DIR}/${OUTPUT_FILE}" >/dev/null 2>&1; then
@@ -677,7 +747,7 @@ if [ "${SCRIPT_MODE}" != "daemon" ]; then
 		# Check daemon process running
 		#
 		IS_NEED_DAEMON_RUN=0
-		if [ -f "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}" ]; then
+		if [ -f "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}" ] && [ ! -L "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}" ]; then
 			OLD_DAEMON_PROCESS_PID=$(cat "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}")
 
 			# shellcheck disable=SC2009
@@ -685,7 +755,10 @@ if [ "${SCRIPT_MODE}" != "daemon" ]; then
 				rm -f "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}"
 				IS_NEED_DAEMON_RUN=1
 			fi
-		else
+		elif [ -L "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}" ]; then
+			if ! rm "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}" >/dev/null 2>&1; then
+				log_err "Could not remove symbolic link(${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}), but continue..."
+			fi
 			IS_NEED_DAEMON_RUN=1
 		fi
 
@@ -722,7 +795,7 @@ else
 		#
 		# Check old process
 		#
-		if [ -f "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}" ]; then
+		if [ -f "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}" ] && [ ! -L "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}" ]; then
 			OLD_DAEMON_PROCESS_PID=$(cat "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}")
 
 			# shellcheck disable=SC2009
@@ -731,7 +804,14 @@ else
 				exit 1
 			fi
 			rm -f "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}"
+
+		elif [ -L "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}" ]; then
+			if ! rm "${PIDDIR}/${SCRIPT_DAEMON_PIDFILE}" >/dev/null 2>&1; then
+				log_err "Could not remove symbolic link(${PIDDIR}/${SCRIPT_DAEMON_PIDFILE})."
+				exit 1
+			fi
 		fi
+
 		#
 		# Write process id to PID FILE
 		#
